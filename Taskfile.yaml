@@ -7,4 +7,8 @@ tasks:
 
   run:
     cmds:
-      - cargo run -q
+      - cargo run -q -- --exif tests/inputs/exif-jpg.txt --pattern "{y}{m}{D}_{t}_{T2}_{r}.{e}"
+
+  test:
+    cmds:
+      - cargo test
