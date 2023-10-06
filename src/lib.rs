@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::read_to_string;
+use std::fs::File;
+use std::io;
+use std::io::{BufRead, BufReader};
 
 use chrono::{Datelike, DateTime, NaiveDateTime, Timelike};
 use regex::Regex;
@@ -9,10 +11,6 @@ use strfmt::strfmt;
 pub type Vars = HashMap<String, String>;
 
 type MyResult<T> = Result<T, Box<dyn Error>>;
-
-fn read_lines(filename: &str) -> Vec<String> {
-    return read_to_string(filename).unwrap().lines().map(|s| s.to_string()).collect();
-}
 
 fn split_exif_line(s: &str) -> Option<(String, String)> {
     let tokens: Vec<&str> = s.splitn(2, ":").collect();
@@ -25,10 +23,15 @@ fn split_exif_line(s: &str) -> Option<(String, String)> {
 
 pub fn read_exif_file(filepath: &str) -> MyResult<Vars> {
     let mut vars: Vars = HashMap::new();
-    let lines = read_lines(filepath);
-    for line in lines {
-        if let Some((key, value)) = split_exif_line(line.as_str()) {
-            vars.insert(key, value);
+    match open(filepath) {
+        Err(err) => eprintln!("failed to open {}: {}", filepath, err),
+        Ok(buf_read) => {
+            for line_result in buf_read.lines() {
+                let line = line_result?;
+                if let Some((key, value)) = split_exif_line(line.as_str()) {
+                    vars.insert(key, value);
+                }
+            }
         }
     }
     Ok(vars)
@@ -111,4 +114,11 @@ pub fn format_filename(pattern: &str, exif_vars: Vars) -> String {
     let mut vars: Vars = extend_vars(&exif_vars);
     vars.extend(exif_vars);
     return strfmt(pattern, &vars).unwrap();
+}
+
+pub fn open(filename: &str) -> MyResult<Box<dyn BufRead>> {
+    match filename {
+        "" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+    }
 }
