@@ -1,0 +1,90 @@
+name: publish exif-rename
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  MACOSX_DEPLOYMENT_TARGET: '10.13'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.config.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            ext: ''
+            args: ''
+          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+            ext: ''
+            args: ''
+          - os: macos-latest
+            rust_target: aarch64-apple-darwin
+            ext: ''
+            args: ''
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            ext: '.exe'
+            args: ''
+          - os: windows-latest
+            rust_target: aarch64-pc-windows-msvc
+            ext: '.exe'
+            args: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.config.rust_target }}
+
+      - name: cache project
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.config.rust_target }}
+
+      - name: build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release ${{ matrix.config.args }}
+
+      - name: upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: exif-rename-${{ matrix.config.rust_target }}${{ matrix.config.ext }}
+          path: target/release/exif-rename${{ matrix.config.ext }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: download built artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: outputs
+
+      - name: pack archives
+        run: .scripts/ci/package.sh
+
+      - name: publish release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: outputs/exif-rename-*.*
+          file_glob: true
+          tag: ${{ github.ref }}
+          overwrite: true
+          body: exif-rename release

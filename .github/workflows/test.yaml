@@ -1,7 +1,10 @@
+name: run test
 on:
   push:
     branches:
-      - '**'
+      - "**"
+    tags:
+      - "!*"
 
 env:
   RUST_BACKTRACE: 1
