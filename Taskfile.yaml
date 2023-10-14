@@ -1,27 +1,90 @@
 version: 3
 
 tasks:
-  add-targets:
+  add-targets-from-darwin:
     cmds:
       - rustup target add aarch64-apple-darwin
+      - rustup target add armv7-unknown-linux-musleabihf
+      - rustup target add x86_64-apple-darwin
+      - rustup target add x86_64-pc-windows-gnu
       - rustup target add x86_64-unknown-linux-musl
 
-  setup-linux:
+  add-targets-from-linux:
     cmds:
-      - task: add-targets
+      - rustup target add armv7-unknown-linux-musleabihf
+      - rustup target add x86_64-pc-windows-gnu
+      - rustup target add x86_64-unknown-linux-musl
+
+  setup-from-darwin:
+    cmds:
+      - task: add-targets-from-darwin
+      - brew install mingw-w64
+      - brew install filosottile/musl-cross/musl-cross
+      - brew install arm-linux-gnueabihf-binutils
+
+  setup-from-linux:
+    cmds:
+      - task: add-targets-from-linux
+      - sudo apt-get install -y mingw-w64
       - sudo apt-get install -y musl-tools
+      - sudo apt-get install -y gcc-arm-linux-gnueabihf 
+
+  setup:
+    cmds:
+      - task: setup-from-{{OS}}
 
   build:
     cmds:
       - cargo build
 
+  build-armv7-linux:
+    cmds:
+      - cargo build --release --target armv7-unknown-linux-musleabihf
+    env:
+      CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER: arm-linux-gnueabihf-ld
+      
   build-amd64-linux:
     cmds:
-      - CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=x86_64-linux-musl-gcc cargo build --release --target x86_64-unknown-linux-musl
+      - cargo build --release --target x86_64-unknown-linux-musl
+    env:
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: x86_64-linux-musl-gcc
+
+  build-amd64-darwin:
+    cmds:
+      - cargo build --release --target x86_64-apple-darwin
 
   build-arm64-darwin:
     cmds:
       - cargo build --release --target aarch64-apple-darwin
+
+  build-amd64-windows:
+    cmds:
+      - cargo build --release --target x86_64-pc-windows-gnu 
+    env:
+      CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER: x86_64-w64-mingw32-gcc
+
+  build-all-from-linux:
+    cmds:
+      - task: build-armv7-linux
+      - task: build-amd64-linux
+      - task: build-amd64-windows
+
+  build-all-from-darwin:
+    cmds:
+      - task: build-armv7-linux
+      - task: build-amd64-darwin
+      - task: build-amd64-linux
+      - task: build-amd64-windows
+      - task: build-arm64-darwin
+
+  build-all:
+    cmds:
+      - task: clean
+      - task: build-all-from-{{OS}}
+
+  clean:
+    cmds:
+      - rm -rf target
 
   run:
     cmds:
